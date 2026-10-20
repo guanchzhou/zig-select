@@ -48,7 +48,7 @@ pub fn fit(gpa: std.mem.Allocator, xs: []const f64, ys: []const f64, weights: ?[
         if (n > 0 and pts[n - 1].x == p.x) {
             const q = &pts[n - 1];
             const w = q.w + p.w;
-            q.y = (q.y * q.w + p.y * p.w) / w;
+            q.y = if (w > 0) (q.y * q.w + p.y * p.w) / w else 0.5 * (q.y + p.y);
             q.w = w;
         } else {
             pts[n] = p;
@@ -71,7 +71,7 @@ pub fn fit(gpa: std.mem.Allocator, xs: []const f64, ys: []const f64, weights: ?[
         blocks += 1;
         while (blocks > 1 and val[blocks - 2] > val[blocks - 1]) {
             const w = wt[blocks - 2] + wt[blocks - 1];
-            val[blocks - 2] = (val[blocks - 2] * wt[blocks - 2] + val[blocks - 1] * wt[blocks - 1]) / w;
+            val[blocks - 2] = if (w > 0) (val[blocks - 2] * wt[blocks - 2] + val[blocks - 1] * wt[blocks - 1]) / w else 0.5 * (val[blocks - 2] + val[blocks - 1]);
             wt[blocks - 2] = w;
             blocks -= 1;
         }

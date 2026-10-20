@@ -43,18 +43,24 @@ pub fn greedy(
     std.debug.assert(values.len == costs.len and out.len >= values.len);
     const order = try gpa.alloc(u32, values.len);
     defer gpa.free(order);
-    for (order, 0..) |*o, i| o.* = @intCast(i);
+    var pos_len: usize = 0;
+    for (values, 0..) |v, i| {
+        if (v > 0) {
+            order[pos_len] = @intCast(i);
+            pos_len += 1;
+        }
+    }
     const ctx: Ctx = .{ .values = values, .costs = costs };
-    std.mem.sort(u32, order, ctx, Ctx.lessThan);
+    std.mem.sort(u32, order[0..pos_len], ctx, Ctx.lessThan);
 
-    const p = pack.pack(order, costs, budget, out);
+    const p = pack.pack(order[0..pos_len], costs, budget, out);
     var value: f64 = 0;
     for (out[0..p.kept]) |i| value += values[i];
 
     if (best_single) {
         var best: ?u32 = null;
         for (values, costs, 0..) |v, c, i| {
-            if (c > budget) continue;
+            if (c > budget or !(v > 0)) continue;
             if (best == null or v > values[best.?]) best = @intCast(i);
         }
         if (best) |b| if (values[b] > value) {

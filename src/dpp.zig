@@ -35,21 +35,25 @@ pub fn greedy(gpa: std.mem.Allocator, l: []const f64, n: usize, max_items: usize
     for (0..n) |i| di2[i] = l[i * n + i];
 
     var j = argmax(di2);
+    if (di2[j] < eps or !(di2[j] > 0)) return 0;
     out[0] = @intCast(j);
     var count: usize = 1;
     while (count < k_max) {
         const k = count - 1;
         const dj = @sqrt(di2[j]);
+        const cj = cis[j * k_max ..][0..k];
+        const lj = l[j * n ..][0..n];
         for (0..n) |i| {
+            const ci = cis[i * k_max ..][0..k];
             var dot: f64 = 0;
-            for (0..k) |t| dot += cis[t * n + j] * cis[t * n + i];
-            const e = (l[j * n + i] - dot) / dj;
-            cis[k * n + i] = e;
+            for (cj, ci) |a, b| dot += a * b;
+            const e = (lj[i] - dot) / dj;
+            cis[i * k_max + k] = e;
             di2[i] -= e * e;
         }
         di2[j] = -std.math.inf(f64);
         j = argmax(di2);
-        if (di2[j] < eps) break;
+        if (di2[j] < eps or !(di2[j] > 0)) break;
         out[count] = @intCast(j);
         count += 1;
     }
@@ -89,4 +93,11 @@ test "stops when the kernel has no more rank" {
     const got = try greedy(std.testing.allocator, &l, 3, 3, 1e-10, &out);
     try std.testing.expectEqual(@as(usize, 1), got);
     try std.testing.expectEqual(@as(u32, 0), out[0]);
+}
+
+test "rank-0 kernel returns 0 items without dividing by zero" {
+    const l = [_]f64{ 0, 0, 0, 0 };
+    var out: [2]u32 = undefined;
+    const got = try greedy(std.testing.allocator, &l, 2, 2, 1e-10, &out);
+    try std.testing.expectEqual(@as(usize, 0), got);
 }

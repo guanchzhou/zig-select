@@ -28,7 +28,7 @@ pub fn order(rel: []const f64, sim: []const f64, lambda: f64, out: []u32, scratc
         out[chosen] = @intCast(best);
         for (0..n) |i| {
             if (max_sim[i] == std.math.inf(f64)) continue;
-            const s = sim[i * n + best];
+            const s = @min(sim[i * n + best], std.math.floatMax(f64));
             if (s > max_sim[i]) max_sim[i] = s;
         }
         max_sim[best] = std.math.inf(f64);
@@ -56,4 +56,14 @@ test "lambda 1 is the relevance order" {
     var scratch: [3]f64 = undefined;
     order(&rel, &sim, 1.0, &out, &scratch);
     try std.testing.expectEqualSlices(u32, &.{ 1, 2, 0 }, &out);
+}
+
+test "non-finite similarity does not corrupt chosen sentinel" {
+    const inf = std.math.inf(f64);
+    const rel = [_]f64{ 1.0, 0.5 };
+    const sim = [_]f64{ inf, inf, inf, inf };
+    var out: [2]u32 = undefined;
+    var scratch: [2]f64 = undefined;
+    order(&rel, &sim, 0.5, &out, &scratch);
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1 }, &out);
 }

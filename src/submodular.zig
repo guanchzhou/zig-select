@@ -66,8 +66,8 @@ pub fn select(
             }
             if (gain <= 0) continue;
             const c: f64 = @floatFromInt(costs[j]);
-            const ratio = if (c == 0) std.math.inf(f64) else gain / std.math.pow(f64, c, p);
-            if (best == null or ratio > best_ratio) {
+            const ratio = if (p == 0) gain else if (c == 0) std.math.inf(f64) else gain / std.math.pow(f64, c, p);
+            if (best == null or ratio > best_ratio or (ratio == best_ratio and gain > best_gain)) {
                 best = j;
                 best_ratio = ratio;
                 best_gain = gain;
