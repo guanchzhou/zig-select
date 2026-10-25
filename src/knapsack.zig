@@ -40,7 +40,7 @@ pub fn greedy(
     best_single: bool,
     out: []u32,
 ) !Result {
-    std.debug.assert(values.len == costs.len and out.len >= values.len);
+    if (values.len != costs.len or out.len < values.len) return error.LengthMismatch;
     const order = try gpa.alloc(u32, values.len);
     defer gpa.free(order);
     var pos_len: usize = 0;
@@ -53,7 +53,7 @@ pub fn greedy(
     const ctx: Ctx = .{ .values = values, .costs = costs };
     std.mem.sort(u32, order[0..pos_len], ctx, Ctx.lessThan);
 
-    const p = pack.pack(order[0..pos_len], costs, budget, out);
+    const p = pack.pack(order[0..pos_len], costs, budget, out) catch unreachable;
     var value: f64 = 0;
     for (out[0..p.kept]) |i| value += values[i];
 
@@ -86,4 +86,10 @@ test "best single item wins when the greedy set is worth less" {
     var out: [2]u32 = undefined;
     const r = try greedy(std.testing.allocator, &values, &costs, 1000, true, &out);
     try std.testing.expectEqualSlices(u32, &.{0}, out[0..r.kept]);
+}
+
+test "rejects mismatched lengths" {
+    var out: [2]u32 = undefined;
+    try std.testing.expectError(error.LengthMismatch, greedy(std.testing.allocator, &.{ 1, 2 }, &.{1}, 10, false, &out));
+    try std.testing.expectError(error.LengthMismatch, greedy(std.testing.allocator, &.{ 1, 2, 3 }, &.{ 1, 2, 3 }, 10, false, &out));
 }

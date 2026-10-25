@@ -6,9 +6,9 @@ const std = @import("std");
 
 /// `sim` is the row-major n x n similarity matrix. Writes all n indices into `out` in MMR order;
 /// `scratch` must hold n values.
-pub fn order(rel: []const f64, sim: []const f64, lambda: f64, out: []u32, scratch: []f64) void {
+pub fn order(rel: []const f64, sim: []const f64, lambda: f64, out: []u32, scratch: []f64) error{ Overflow, LengthMismatch }!void {
     const n = rel.len;
-    std.debug.assert(sim.len == n * n and out.len >= n and scratch.len >= n);
+    if (sim.len != try std.math.mul(usize, n, n) or out.len < n or scratch.len < n) return error.LengthMismatch;
     const max_sim = scratch[0..n];
     // max_sim[i] is item i's largest similarity to the chosen items; +inf marks a chosen item.
     @memset(max_sim, -std.math.inf(f64));
@@ -45,7 +45,7 @@ test "a near duplicate is pushed down" {
     };
     var out: [3]u32 = undefined;
     var scratch: [3]f64 = undefined;
-    order(&rel, &sim, 0.5, &out, &scratch);
+    try order(&rel, &sim, 0.5, &out, &scratch);
     try std.testing.expectEqualSlices(u32, &.{ 0, 2, 1 }, &out);
 }
 
@@ -54,7 +54,7 @@ test "lambda 1 is the relevance order" {
     const sim = [_]f64{ 1, 0, 0, 0, 1, 0, 0, 0, 1 };
     var out: [3]u32 = undefined;
     var scratch: [3]f64 = undefined;
-    order(&rel, &sim, 1.0, &out, &scratch);
+    try order(&rel, &sim, 1.0, &out, &scratch);
     try std.testing.expectEqualSlices(u32, &.{ 1, 2, 0 }, &out);
 }
 
@@ -64,6 +64,15 @@ test "non-finite similarity does not corrupt chosen sentinel" {
     const sim = [_]f64{ inf, inf, inf, inf };
     var out: [2]u32 = undefined;
     var scratch: [2]f64 = undefined;
-    order(&rel, &sim, 0.5, &out, &scratch);
+    try order(&rel, &sim, 0.5, &out, &scratch);
     try std.testing.expectEqualSlices(u32, &.{ 0, 1 }, &out);
+}
+
+test "rejects mismatched lengths" {
+    var out: [2]u32 = undefined;
+    var scratch: [2]f64 = undefined;
+    const rel = [_]f64{ 1, 0.5 };
+    try std.testing.expectError(error.LengthMismatch, order(&rel, &.{ 1, 0, 0 }, 0.5, &out, &scratch));
+    try std.testing.expectError(error.LengthMismatch, order(&rel, &.{ 1, 0, 0, 1 }, 0.5, out[0..1], &scratch));
+    try std.testing.expectError(error.LengthMismatch, order(&rel, &.{ 1, 0, 0, 1 }, 0.5, &out, scratch[0..1]));
 }

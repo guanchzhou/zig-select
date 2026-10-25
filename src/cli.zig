@@ -96,7 +96,7 @@ pub fn main(init: std.process.Init) !void {
         const in = parse(struct { order: []const u32, costs: []const u32, budget: u64 }, arena, text);
         for (in.order) |i| if (i >= in.costs.len) fail("order refers to unit {d} of {d}", .{ i, in.costs.len });
         const kept = try arena.alloc(u32, in.order.len);
-        const p = select.pack.pack(in.order, in.costs, in.budget, kept);
+        const p = try select.pack.pack(in.order, in.costs, in.budget, kept);
         try emit(out, .{ .kept = kept[0..p.kept], .cost = p.cost });
     } else if (std.mem.eql(u8, cmd, "knapsack")) {
         const in = parse(struct { values: []const f64, costs: []const u32, budget: u64, best_single: bool = true }, arena, text);
@@ -117,7 +117,7 @@ pub fn main(init: std.process.Init) !void {
         const n = in.relevance.len;
         const sim = try square(arena, in.similarity, n, "similarity");
         const order = try arena.alloc(u32, n);
-        select.mmr.order(in.relevance, sim, in.lambda, order, try arena.alloc(f64, n));
+        try select.mmr.order(in.relevance, sim, in.lambda, order, try arena.alloc(f64, n));
         try emit(out, .{ .order = order });
     } else if (std.mem.eql(u8, cmd, "submodular")) {
         const in = parse(struct {
@@ -154,7 +154,7 @@ pub fn main(init: std.process.Init) !void {
             n = q.len;
             const flat = try flatten(arena, f, null);
             const l = try arena.alloc(f64, n * n);
-            select.dpp.kernel(flat, if (n == 0) 0 else f[0].len, q, l);
+            try select.dpp.kernel(flat, if (n == 0) 0 else f[0].len, q, l);
             break :blk l;
         };
         const order = try arena.alloc(u32, n);
@@ -167,6 +167,6 @@ pub fn main(init: std.process.Init) !void {
         const flat = try flatten(arena, in.losses, m);
         if (!select.conformal.isMonotone(flat, in.losses.len, m, in.bound))
             fail("each losses row must be non-increasing and within [0, bound]", .{});
-        try emit(out, .{ .index = select.conformal.calibrate(flat, in.losses.len, m, in.alpha, in.bound) });
+        try emit(out, .{ .index = try select.conformal.calibrate(flat, in.losses.len, m, in.alpha, in.bound) });
     } else unreachable;
 }

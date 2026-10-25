@@ -34,9 +34,13 @@ fn byX(_: void, a: Point, b: Point) bool {
     return a.x < b.x;
 }
 
-/// Fits a non-decreasing step function. `weights` may be null (all ones). Needs at least one point.
+/// Fits a non-decreasing step function. `weights` may be null (all ones). Needs at least one
+/// point, and no x may be NaN.
 pub fn fit(gpa: std.mem.Allocator, xs: []const f64, ys: []const f64, weights: ?[]const f64) !Model {
-    std.debug.assert(xs.len == ys.len and xs.len > 0);
+    if (xs.len == 0) return error.Empty;
+    if (ys.len != xs.len) return error.LengthMismatch;
+    if (weights) |w| if (w.len != xs.len) return error.LengthMismatch;
+    for (xs) |x| if (std.math.isNan(x)) return error.NotANumber;
     const pts = try gpa.alloc(Point, xs.len);
     defer gpa.free(pts);
     for (pts, xs, ys, 0..) |*p, x, y, i| p.* = .{ .x = x, .y = y, .w = if (weights) |w| w[i] else 1 };
@@ -101,4 +105,12 @@ test "equal x values are averaged before pooling" {
     defer m.deinit(std.testing.allocator);
     try std.testing.expectApproxEqAbs(@as(f64, 0.5), m.predict(0.5), 1e-12);
     try std.testing.expectApproxEqAbs(@as(f64, 1), m.predict(0.7), 1e-12);
+}
+
+test "rejects empty, mismatched and NaN input" {
+    const gpa = std.testing.allocator;
+    try std.testing.expectError(error.Empty, fit(gpa, &.{}, &.{}, null));
+    try std.testing.expectError(error.LengthMismatch, fit(gpa, &.{ 0.1, 0.2 }, &.{1}, null));
+    try std.testing.expectError(error.LengthMismatch, fit(gpa, &.{ 0.1, 0.2 }, &.{ 0, 1 }, &.{1}));
+    try std.testing.expectError(error.NotANumber, fit(gpa, &.{ 0.1, std.math.nan(f64) }, &.{ 0, 1 }, null));
 }

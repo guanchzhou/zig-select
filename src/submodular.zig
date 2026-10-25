@@ -42,7 +42,7 @@ pub fn select(
     out: []u32,
 ) !Result {
     const n = rel.len;
-    std.debug.assert(sim.len == n * n and costs.len == n and out.len >= n);
+    if (sim.len != try std.math.mul(usize, n, n) or costs.len != n or out.len < n) return error.LengthMismatch;
     const cover = try gpa.alloc(f64, n);
     defer gpa.free(cover);
     @memset(cover, 0);
@@ -58,13 +58,13 @@ pub fn select(
         var best_ratio: f64 = 0;
         var best_gain: f64 = 0;
         for (0..n) |j| {
-            if (taken[j] or used + costs[j] > budget) continue;
+            if (taken[j] or costs[j] > budget - used) continue;
             var gain: f64 = lambda * rel[j];
             for (0..n) |i| {
                 const s = @max(sim[i * n + j], 0);
                 if (s > cover[i]) gain += rel[i] * (s - cover[i]);
             }
-            if (gain <= 0) continue;
+            if (!(gain > 0)) continue;
             const c: f64 = @floatFromInt(costs[j]);
             const ratio = if (p == 0) gain else if (c == 0) std.math.inf(f64) else gain / std.math.pow(f64, c, p);
             if (best == null or ratio > best_ratio or (ratio == best_ratio and gain > best_gain)) {
@@ -125,4 +125,23 @@ test "objective of the chosen set equals the accumulated gains" {
     var out: [4]u32 = undefined;
     const r = try select(std.testing.allocator, &rel, &sim, &costs, 120, 0.5, 0.5, &out);
     try std.testing.expectApproxEqAbs(objectiveOf(&rel, &sim, 0.5, out[0..r.kept]), r.value, 1e-12);
+}
+
+test "a NaN gain is never selected" {
+    const rel = [_]f64{ std.math.nan(f64), 0.5 };
+    const sim = [_]f64{ 1, 0, 0, 1 };
+    const costs = [_]u32{ 1, 1 };
+    var out: [2]u32 = undefined;
+    const r = try select(std.testing.allocator, &rel, &sim, &costs, 1, 0, 1, &out);
+    try std.testing.expectEqualSlices(u32, &.{1}, out[0..r.kept]);
+}
+
+test "rejects mismatched lengths" {
+    const gpa = std.testing.allocator;
+    const rel = [_]f64{ 1, 0.5 };
+    const sim = [_]f64{ 1, 0, 0, 1 };
+    var out: [2]u32 = undefined;
+    try std.testing.expectError(error.LengthMismatch, select(gpa, &rel, sim[0..3], &.{ 1, 1 }, 2, 0, 1, &out));
+    try std.testing.expectError(error.LengthMismatch, select(gpa, &rel, &sim, &.{1}, 2, 0, 1, &out));
+    try std.testing.expectError(error.LengthMismatch, select(gpa, &rel, &sim, &.{ 1, 1 }, 2, 0, 1, out[0..1]));
 }

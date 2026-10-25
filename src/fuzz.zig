@@ -55,7 +55,7 @@ fn budgeted(_: void, smith: *Smith) anyerror!void {
     const budget = smith.valueRangeAtMost(u64, 0, 8000);
 
     var out: [max_n]u32 = undefined;
-    const p = pack.pack(order[0..n], costs[0..n], budget, &out);
+    const p = try pack.pack(order[0..n], costs[0..n], budget, &out);
     try std.testing.expect(p.cost <= budget);
     try expectDistinct(out[0..p.kept], n);
 
@@ -75,7 +75,7 @@ fn budgeted(_: void, smith: *Smith) anyerror!void {
     try expectDistinct(out[0..s.kept], n);
 
     var scratch: [max_n]f64 = undefined;
-    mmr.order(values[0..n], sim[0 .. n * n], unitFloat(smith), &out, &scratch);
+    try mmr.order(values[0..n], sim[0 .. n * n], unitFloat(smith), &out, &scratch);
     try expectDistinct(out[0..n], n);
 }
 
@@ -93,7 +93,7 @@ fn dppInvariants(_: void, smith: *Smith) anyerror!void {
         q[i] = 0.1 + unitFloat(smith) * 5;
     }
     var l: [max_n * max_n]f64 = undefined;
-    dpp.kernel(f[0 .. n * d], d, q[0..n], l[0 .. n * n]);
+    try dpp.kernel(f[0 .. n * d], d, q[0..n], l[0 .. n * n]);
     const max_items = upTo(smith, 1, n);
     var out: [max_n]u32 = undefined;
     const got = try dpp.greedy(std.testing.allocator, l[0 .. n * n], n, max_items, 1e-9, &out);
@@ -118,7 +118,7 @@ fn conformalInvariants(_: void, smith: *Smith) anyerror!void {
     }
     try std.testing.expect(conformal.isMonotone(losses[0 .. n * m], n, m, 1));
     const alpha = unitFloat(smith);
-    const chosen = conformal.calibrate(losses[0 .. n * m], n, m, alpha, 1);
+    const chosen = try conformal.calibrate(losses[0 .. n * m], n, m, alpha, 1);
     const nf: f64 = @floatFromInt(n);
     for (0..m) |j| {
         var sum: f64 = 0;

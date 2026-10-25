@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 - 2026-10-25
+
+- Public entry points return errors instead of asserting on caller input: `error.LengthMismatch` for mismatched slice lengths in every selector, `error.IndexOutOfRange` for a `pack` order entry past `costs`, `error.Empty` for empty `isotonic.fit` and `conformal.calibrate` input, `error.NotANumber` for a NaN x in `isotonic.fit`, and `error.Overflow` when `n * n`, `n * d` or `n * m` overflows.
+- `pack.pack`, `mmr.order`, `dpp.kernel` and `conformal.calibrate` now return error unions; callers need `try`.
+- NaN losses fail `conformal.isMonotone`, which also returns false when `losses` is not n x m; NaN gains are never selected in `submodular.select`.
+- Budget checks in `pack` and `submodular.select` no longer overflow for budgets near the `u64` limit.
+
 ## 0.1.1 - 2026-10-20
 
 - Guard `dpp.greedy` against rank-0 kernels before selecting the first item and store Cholesky factors in item-major layout for unit-stride inner products.

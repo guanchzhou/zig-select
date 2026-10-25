@@ -49,7 +49,7 @@ test "pack matches the reference" {
     for (g.value.pack) |c| {
         const out = try std.testing.allocator.alloc(u32, c.order.len);
         defer std.testing.allocator.free(out);
-        const p = select.pack.pack(c.order, c.costs, c.budget, out);
+        const p = try select.pack.pack(c.order, c.costs, c.budget, out);
         try std.testing.expectEqualSlices(u32, c.kept, out[0..p.kept]);
         try std.testing.expectEqual(c.cost, p.cost);
     }
@@ -86,7 +86,7 @@ test "mmr matches the reference" {
         defer std.testing.allocator.free(out);
         const scratch = try std.testing.allocator.alloc(f64, c.rel.len);
         defer std.testing.allocator.free(scratch);
-        select.mmr.order(c.rel, c.sim, c.lambda, out, scratch);
+        try select.mmr.order(c.rel, c.sim, c.lambda, out, scratch);
         try std.testing.expectEqualSlices(u32, c.order, out);
     }
 }
@@ -111,7 +111,7 @@ test "dpp greedy matches brute-force determinant maximisation" {
         const n = c.quality.len;
         const l = try std.testing.allocator.alloc(f64, n * n);
         defer std.testing.allocator.free(l);
-        select.dpp.kernel(c.features, c.d, c.quality, l);
+        try select.dpp.kernel(c.features, c.d, c.quality, l);
         const out = try std.testing.allocator.alloc(u32, n);
         defer std.testing.allocator.free(out);
         const got = try select.dpp.greedy(std.testing.allocator, l, n, c.max_items, c.eps, out);
@@ -124,6 +124,6 @@ test "conformal matches the reference" {
     defer g.deinit();
     for (g.value.conformal) |c| {
         try std.testing.expect(select.conformal.isMonotone(c.losses, c.n, c.m, c.bound));
-        try std.testing.expectEqual(c.index, select.conformal.calibrate(c.losses, c.n, c.m, c.alpha, c.bound));
+        try std.testing.expectEqual(c.index, try select.conformal.calibrate(c.losses, c.n, c.m, c.alpha, c.bound));
     }
 }

@@ -8,9 +8,9 @@ const std = @import("std");
 
 /// Builds the quality-diversity kernel L_ij = q_i * <f_i, f_j> * q_j from n feature rows of
 /// length d (row-major) into `l` (n x n, row-major).
-pub fn kernel(features: []const f64, d: usize, quality: []const f64, l: []f64) void {
+pub fn kernel(features: []const f64, d: usize, quality: []const f64, l: []f64) error{ Overflow, LengthMismatch }!void {
     const n = quality.len;
-    std.debug.assert(features.len == n * d and l.len == n * n);
+    if (features.len != try std.math.mul(usize, n, d) or l.len != try std.math.mul(usize, n, n)) return error.LengthMismatch;
     for (0..n) |i| {
         for (i..n) |j| {
             var dot: f64 = 0;
@@ -24,7 +24,7 @@ pub fn kernel(features: []const f64, d: usize, quality: []const f64, l: []f64) v
 
 /// Writes the chosen indices, in selection order, into `out` and returns how many were chosen.
 pub fn greedy(gpa: std.mem.Allocator, l: []const f64, n: usize, max_items: usize, eps: f64, out: []u32) !usize {
-    std.debug.assert(l.len == n * n and out.len >= @min(max_items, n));
+    if (l.len != try std.math.mul(usize, n, n) or out.len < @min(max_items, n)) return error.LengthMismatch;
     if (n == 0 or max_items == 0) return 0;
     const k_max = @min(max_items, n);
     const cis = try gpa.alloc(f64, k_max * n);
@@ -76,7 +76,7 @@ test "prefers a diverse second item over a near duplicate" {
     };
     const q = [_]f64{ 1.0, 1.0, 0.9 };
     var l: [9]f64 = undefined;
-    kernel(&f, 2, &q, &l);
+    try kernel(&f, 2, &q, &l);
     var out: [3]u32 = undefined;
     const got = try greedy(std.testing.allocator, &l, 3, 2, 1e-10, &out);
     try std.testing.expectEqual(@as(usize, 2), got);
@@ -88,7 +88,7 @@ test "stops when the kernel has no more rank" {
     const f = [_]f64{ 1.0, 0.5, 0.25 };
     const q = [_]f64{ 1.0, 1.0, 1.0 };
     var l: [9]f64 = undefined;
-    kernel(&f, 1, &q, &l);
+    try kernel(&f, 1, &q, &l);
     var out: [3]u32 = undefined;
     const got = try greedy(std.testing.allocator, &l, 3, 3, 1e-10, &out);
     try std.testing.expectEqual(@as(usize, 1), got);
@@ -100,4 +100,16 @@ test "rank-0 kernel returns 0 items without dividing by zero" {
     var out: [2]u32 = undefined;
     const got = try greedy(std.testing.allocator, &l, 2, 2, 1e-10, &out);
     try std.testing.expectEqual(@as(usize, 0), got);
+}
+
+test "rejects mismatched lengths" {
+    const gpa = std.testing.allocator;
+    var l: [4]f64 = undefined;
+    var out: [2]u32 = undefined;
+    try std.testing.expectError(error.LengthMismatch, kernel(&.{ 1, 0, 0 }, 2, &.{ 1, 1 }, &l));
+    try std.testing.expectError(error.LengthMismatch, kernel(&.{ 1, 0, 0, 1 }, 2, &.{ 1, 1 }, l[0..3]));
+    try std.testing.expectError(error.Overflow, kernel(&.{}, std.math.maxInt(usize), &.{ 1, 1 }, &l));
+    try std.testing.expectError(error.LengthMismatch, greedy(gpa, l[0..3], 2, 2, 0, &out));
+    try std.testing.expectError(error.LengthMismatch, greedy(gpa, &l, 2, 2, 0, out[0..1]));
+    try std.testing.expectError(error.Overflow, greedy(gpa, &l, std.math.maxInt(usize), 2, 0, &out));
 }
